@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Little Alchemy с расширенными комбинациями</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f0f0f0; }
+    h1 { text-align: center; }
+    #elements {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .element {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: grab;
+      border: 1px solid #888;
+      border-radius: 5px;
+      background: white;
+      user-select: none;
+      text-align: center;
+      min-width: 80px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      transition: background 0.3s;
+    }
+    .element:hover {
+      background: #d0e7ff;
+    }
+    .element.dragging {
+      opacity: 0.5;
+      cursor: grabbing;
+    }
+    .element.selected {
+      background: #ffd966;
+      border-color: #cc9a00;
+    }
+    #message {
+      text-align: center;
+      font-weight: bold;
+      color: #2a7f2a;
+      min-height: 24px;
+      margin-bottom: 20px;
+    }
+    #toggleModeBtn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 10px 15px;
+      background: #2a7f2a;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      user-select: none;
+      transition: background 0.3s;
+      z-index: 1000;
+    }
+    #toggleModeBtn:hover {
+      background: #236622;
+    }
+  </style>
+</head>
+<body>
+  <h1>Little Alchemy</h1>
+  
+  <div id="message"></div>
+  <div id="elements"></div>
+
+  <button id="toggleModeBtn">Версия для телефонов</button>
+  
+  <script>
+    let elements = ['Вода', 'Огонь', 'Земля', 'Воздух', 'Солнце', 'Металл', 'Хлеб'];
+
+    const combinations = {
+      'Вода+Огонь': 'Пар',
+      'Огонь+Земля': 'Лава',
+      'Вода+Земля': 'Грязь',
+      'Воздух+Огонь': 'Дым',
+
+      'Вода+Пар': 'Облако',
+      'Воздух+Облако': 'Дождь',
+      'Вода+Дождь': 'Река',
+      'Река+Земля': 'Растение',
+      'Огонь+Дым': 'Сажа',
+      'Лава+Вода': 'Камень',
+      'Камень+Растение': 'Дерево',
+      'Дерево+Огонь': 'Пепел',
+      'Пепел+Вода': 'Глина',
+      'Глина+Огонь': 'Кирпич',
+      'Кирпич+Кирпич': 'Стена',
+      'Дерево+Инструмент': 'Стул',
+      'Огонь+Дерево': 'Уголь',
+      'Уголь+Вода': 'Графит',
+      'Графит+Кирпич': 'Печь',
+
+      'Вода+Растение': 'Водоросль',
+      'Воздух+Водоросль': 'Кислород',
+      'Огонь+Водоросль': 'Масло',
+      'Земля+Масло': 'Глина',
+      'Глина+Вода': 'Глина влажная',
+      'Глина влажная+Огонь': 'Керамика',
+
+      'Воздух+Камень': 'Пыль',
+      'Пыль+Вода': 'Грязь',
+      'Грязь+Растение': 'Трава',
+      'Трава+Огонь': 'Пепел',
+
+      'Камень+Дерево': 'Инструмент',
+      'Инструмент+Камень': 'Молот',
+      'Молот+Кирпич': 'Стена крепче',
+
+      'Вода+Воздух': 'Туман',
+      'Туман+Солнце': 'Радуга',
+      'Огонь+Солнце': 'Свет',
+      'Свет+Растение': 'Цветок',
+      'Цветок+Вода': 'Фрукт',
+      'Фрукт+Огонь': 'Джем',
+      'Джем+Хлеб': 'Тост',
+
+      'Хлеб+Вода': 'Тесто',
+      'Тесто+Огонь': 'Хлеб',
+
+      'Воздух+Пыль': 'Пыльца',
+      'Пыльца+Растение': 'Плод',
+      'Плод+Вода': 'Сок',
+
+      'Огонь+Металл': 'Расплавленный металл',
+      'Камень+Металл': 'Инструмент металлический',
+      'Металл+Огонь': 'Металл расплавленный',
+
+      'Металл+Дерево': 'Механизм',
+
+      'Механизм+Инструмент': 'Часы',
+
+      'Вода+Металл': 'Ржавчина',
+    };
+
+    const container = document.getElementById('elements');
+    const message = document.getElementById('message');
+    const toggleModeBtn = document.getElementById('toggleModeBtn');
+
+    let draggedElement = null;
+    let phoneMode = false;  // Режим для телефонов: выбор по нажатию
+    let selectedElements = [];
+
+    function updateElements() {
+      container.innerHTML = '';
+      elements.forEach(el => {
+        const div = document.createElement('div');
+        div.className = 'element';
+        div.textContent = el;
+        div.dataset.name = el;
+
+        if (!phoneMode) {
+          // Классический режим с drag'n'drop
+          div.setAttribute('draggable', 'true');
+
+          div.addEventListener('dragstart', (e) => {
+            draggedElement = e.target;
+            e.target.classList.add('dragging');
+            message.textContent = `Перетащите элемент "${e.target.textContent}" на другой`;
+          });
+
+          div.addEventListener('dragend', (e) => {
+            draggedElement = null;
+            e.target.classList.remove('dragging');
+            message.textContent = '';
+          });
+
+          div.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.target.style.background = '#a0c4ff';
+          });
+
+          div.addEventListener('dragleave', (e) => {
+            e.target.style.background = 'white';
+          });
+
+          div.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.target.style.background = 'white';
+
+            if (draggedElement && draggedElement !== e.target) {
+              combineElements(draggedElement.dataset.name, e.target.dataset.name);
+            }
+          });
+        } else {
+          // Телефонный режим: выбор по клику
+          div.style.cursor = 'pointer';
+
+          div.addEventListener('click', () => {
+            if (selectedElements.length < 2 && !selectedElements.includes(el)) {
+              selectedElements.push(el);
+              div.classList.add('selected');
+              if (selectedElements.length === 2) {
+                message.textContent = `Ты выбрал: ${selectedElements[0]} + ${selectedElements[1]}`;
+                setTimeout(() => {
+                  combineElements(selectedElements[0], selectedElements[1]);
+                  clearSelection();
+                }, 1000);
+              } else {
+                message.textContent = `Выберите второй элемент`;
+              }
+            }
+          });
+        }
+
+        container.appendChild(div);
+      });
+    }
+
+    function clearSelection() {
+      selectedElements = [];
+      const elems = document.querySelectorAll('.element.selected');
+      elems.forEach(e => e.classList.remove('selected'));
+    }
+
+    function combineElements(a, b) {
+      const key1 = a + '+' + b;
+      const key2 = b + '+' + a;
+
+      let result = combinations[key1] || combinations[key2];
+
+      if (result) {
+        if (!elements.includes(result)) {
+          elements.push(result);
+          updateElements();
+        }
+        message.textContent = `Получился новый элемент: ${result}!`;
+      } else {
+        message.textContent = `Невозможно объединить "${a}" и "${b}".`;
+      }
+    }
+
+    toggleModeBtn.addEventListener('click', () => {
+      phoneMode = !phoneMode;
+      clearSelection();
+      message.textContent = '';
+      if (phoneMode) {
+        toggleModeBtn.textContent = 'Версия для ПК (drag & drop)';
+      } else {
+        toggleModeBtn.textContent = 'Версия для телефонов';
+      }
+      updateElements();
+    });
+
+    updateElements();
+  </script>
+</body>
+</html>
