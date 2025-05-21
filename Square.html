@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Улетающий Квадрат</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
+      background: #f0f0f0;
+      position: relative;
+      touch-action: none;
+    }
+    #start-screen {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #f0f0f0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      user-select: none;
+    }
+    #start-screen h1 {
+      font-size: 48px;
+      margin-bottom: 40px;
+      color: #333;
+    }
+    #start-square {
+      width: 100px;
+      height: 100px;
+      background-color: crimson;
+      border-radius: 10px;
+      margin-bottom: 40px;
+      pointer-events: none; /* чтобы квадрат не реагировал на клики на старте */
+    }
+    #start-button {
+      padding: 16px 40px;
+      font-size: 24px;
+      border: none;
+      border-radius: 8px;
+      background-color: crimson;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    #start-button:hover {
+      background-color: darkred;
+    }
+    #square {
+      width: 100px;
+      height: 100px;
+      background-color: crimson;
+      position: absolute;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.4s ease;
+      touch-action: none;
+      user-select: none;
+      z-index: 50;
+      display: none; /* скрываем квадрат до старта */
+    }
+    #controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 10;
+      display: none; /* скрываем контролы до старта */
+    }
+    button {
+      padding: 16px 24px;
+      font-size: 18px;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      background-color: #ffffff;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      user-select: none;
+      transition: background-color 0.2s ease;
+    }
+    button:hover:not(.locked) {
+      background-color: #e0e0e0;
+    }
+    button.locked {
+      cursor: not-allowed;
+      color: #999;
+      background-color: #f5f5f5;
+    }
+    #speed-display {
+      margin-top: 10px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    #click-counter {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      font-size: 20px;
+      font-weight: bold;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 8px 16px;
+      border-radius: 10px;
+      user-select: none;
+      z-index: 20;
+      display: none; /* скрываем счётчик до старта */
+    }
+    #scale-flag {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      background: #222;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      user-select: none;
+      z-index: 30;
+      display: none;
+    }
+    @media (min-width: 1024px) {
+      #scale-flag {
+        display: block;
+      }
+    }
+    @media (max-width: 600px) {
+      #controls {
+        flex-direction: row;
+        flex-wrap: wrap;
+        bottom: 10px;
+        top: auto;
+        left: 50%;
+        transform: translateX(-50%);
+        justify-content: center;
+      }
+      button {
+        font-size: 16px;
+        padding: 12px 16px;
+      }
+      #speed-display {
+        width: 100%;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="start-screen">
+    <h1>Поймай Квадрат</h1>
+    <div id="start-square"></div>
+    <button id="start-button">Играть</button>
+  </div>
+
+  <div id="controls"></div>
+  <div id="square"></div>
+  <div id="click-counter">Клики: 0</div>
+  <div id="scale-flag">Для лучшего опыта играйте на 50% масштаба</div>
+
+  <script>
+    const startScreen = document.getElementById('start-screen');
+    const startButton = document.getElementById('start-button');
+    const square = document.getElementById('square');
+    const clickCounter = document.getElementById('click-counter');
+    const controls = document.getElementById('controls');
+    const speedDisplay = document.createElement('div');
+    speedDisplay.id = 'speed-display';
+    controls.appendChild(speedDisplay);
+
+    let posX = 300, posY = 300;
+    let clicks = parseInt(localStorage.getItem('clicks') || '0');
+
+    const speeds = [
+      { speed: 250, label: 'очень быстро', unlocked: true },
+      { speed: 150, label: 'быстро', unlocked: false },
+      { speed: 80,  label: 'обычно', unlocked: false },
+      { speed: 30,  label: 'медленно', unlocked: false },
+      { speed: 10,  label: 'очень медленно', unlocked: false }
+    ];
+
+    const unlockClicks = [0, 2, 5, 10, 20];
+
+    let currentSpeedIndex = parseInt(localStorage.getItem('currentSpeedIndex')) || 0;
+
+    if(localStorage.getItem('speedsUnlocked')) {
+      const unlocked = JSON.parse(localStorage.getItem('speedsUnlocked'));
+      for(let i = 0; i < speeds.length; i++) {
+        speeds[i].unlocked = unlocked[i];
+      }
+    }
+
+    let moveDistance = speeds[currentSpeedIndex].speed;
+
+    function renderButtons() {
+      controls.querySelectorAll('button').forEach(b => b.remove());
+      speeds.forEach((spd, i) => {
+        const btn = document.createElement('button');
+        btn.textContent = spd.unlocked ? spd.label : `🔒 ${spd.label}`;
+        if (!spd.unlocked) btn.classList.add('locked');
+        btn.addEventListener('click', () => {
+          if (spd.unlocked) {
+            currentSpeedIndex = i;
+            moveDistance = spd.speed;
+            updateSpeedDisplay();
+            saveState();
+          } else {
+            alert(`Скорость "${spd.label}" заблокирована. Нажмите больше раз на квадрат, чтобы разблокировать.`);
+          }
+        });
+        controls.insertBefore(btn, speedDisplay);
+      });
+    }
+
+    function updateSpeedDisplay() {
+      speedDisplay.textContent = `Текущая скорость: ${speeds[currentSpeedIndex].label}`;
+      renderButtons();
+      clickCounter.textContent = `Клики: ${clicks}`;
+    }
+
+    function unlockSpeedsByClicks() {
+      let unlockedSomething = false;
+      for (let i = 1; i < speeds.length; i++) {
+        if (!speeds[i].unlocked && clicks >= unlockClicks[i]) {
+          speeds[i].unlocked = true;
+          unlockedSomething = true;
+        }
+      }
+      if (unlockedSomething) {
+        for (let i = speeds.length - 1; i >= 0; i--) {
+          if (speeds[i].unlocked) {
+            currentSpeedIndex = i;
+            moveDistance = speeds[i].speed;
+            break;
+          }
+        }
+        updateSpeedDisplay();
+        saveState();
+      }
+    }
+
+    function clamp(val, min, max) {
+      return Math.max(min, Math.min(max, val));
+    }
+
+    function teleportIfInCorner() {
+      const maxX = window.innerWidth - square.offsetWidth;
+      const maxY = window.innerHeight - square.offsetHeight;
+      const nearEdgeThreshold = 5;
+      const inLeft = posX <= nearEdgeThreshold;
+      const inRight = posX >= maxX - nearEdgeThreshold;
+      const inTop = posY <= nearEdgeThreshold;
+      const inBottom = posY >= maxY - nearEdgeThreshold;
+      if (
+        (inLeft && inTop) ||
+        (inLeft && inBottom) ||
+        (inRight && inTop) ||
+        (inRight && inBottom)
+      ) {
+        posX = maxX / 2;
+        posY = maxY / 2;
+        square.style.transform = `translate(${posX}px, ${posY}px)`;
+      }
+    }
+
+    function moveAwayFromPointer(clientX, clientY) {
+      const rect = square.getBoundingClientRect();
+      const squareCenterX = rect.left + rect.width / 2;
+      const squareCenterY = rect.top + rect.height / 2;
+      const dx = squareCenterX - clientX;
+      const dy = squareCenterY - clientY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance === 0) return;
+      const directionX = dx / distance;
+      const directionY = dy / distance;
+      posX = clamp(posX + directionX * moveDistance, 0, window.innerWidth - square.offsetWidth);
+      posY = clamp(posY + directionY * moveDistance, 0, window.innerHeight - square.offsetHeight);
+      square.style.transform = `translate(${posX}px, ${posY}px)`;
+      teleportIfInCorner();
+    }
+
+    document.addEventListener('mousemove', e => {
+      if (!gameStarted) return;
+      const rect = square.getBoundingClientRect();
+      const padding = 100;
+      if (
+        e.clientX > rect.left - padding &&
+        e.clientX < rect.right + padding &&
+        e.clientY > rect.top - padding &&
+        e.clientY < rect.bottom + padding
+      ) {
+        moveAwayFromPointer(e.clientX, e.clientY);
+      }
+    });
+
+    document.addEventListener('touchmove', e => {
+      if (!gameStarted) return;
+      if (e.touches.length === 0) return;
+      const touch = e.touches[0];
+      const rect = square.getBoundingClientRect();
+      const padding = 100;
+      if (
+        touch.clientX > rect.left - padding &&
+        touch.clientX < rect.right + padding &&
+        touch.clientY > rect.top - padding &&
+        touch.clientY < rect.bottom + padding
+      ) {
+        moveAwayFromPointer(touch.clientX, touch.clientY);
+      }
+    }, { passive: false });
+
+    square.addEventListener('click', () => {
+      if (!gameStarted) return;
+      clicks++;
+      clickCounter.textContent = `Клики: ${clicks}`;
+      unlockSpeedsByClicks();
+      saveState();
+    });
+
+    function saveState() {
+      localStorage.setItem('clicks', clicks);
+      localStorage.setItem('currentSpeedIndex', currentSpeedIndex);
+      localStorage.setItem('speedsUnlocked', JSON.stringify(speeds.map(s => s.unlocked)));
+    }
+
+    let gameStarted = false;
+
+    startButton.addEventListener('click', () => {
+      gameStarted = true;
+      startScreen.style.display = 'none';
+      square.style.display = 'block';
+      controls.style.display = 'flex';
+      clickCounter.style.display = 'block';
+      square.style.transform = `translate(${posX}px, ${posY}px)`;
+      updateSpeedDisplay();
+    });
+
+  </script>
+</body>
+</html>
