@@ -36,7 +36,7 @@
       background-color: crimson;
       border-radius: 10px;
       margin-bottom: 40px;
-      pointer-events: none; /* чтобы квадрат не реагировал на клики на старте */
+      pointer-events: none;
     }
     #start-button {
       padding: 16px 40px;
@@ -62,7 +62,7 @@
       touch-action: none;
       user-select: none;
       z-index: 50;
-      display: none; /* скрываем квадрат до старта */
+      display: none;
     }
     #controls {
       position: absolute;
@@ -72,7 +72,7 @@
       flex-direction: column;
       gap: 10px;
       z-index: 10;
-      display: none; /* скрываем контролы до старта */
+      display: none;
     }
     button {
       padding: 16px 24px;
@@ -112,7 +112,7 @@
       border-radius: 10px;
       user-select: none;
       z-index: 20;
-      display: none; /* скрываем счётчик до старта */
+      display: none;
     }
     #scale-flag {
       position: fixed;
